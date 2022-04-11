@@ -10,6 +10,8 @@ Durable Objects are used to store the state of each torrent and its peers. This 
 
 `GET /_peers?info_hash=...` is a debug endpoint that returns the peer state for a metainfo file.
 
+`GET /_purge?info_hash=...` is a debug endpoint that removes all registered peers for a metainfo file.
+
 
 ### TODO
 - [x] remove old peers that didn't disconnect properly (based on last seen timestamp)
