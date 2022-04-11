@@ -58,7 +58,7 @@ export class Torrent {
   }
 
   // Handle HTTP requests from clients.
-  async fetch(request: Request) {
+  async fetch(request: Request, env: Env) {
     const url = new URL(request.url)
     if (url.pathname === '/announce') {
       console.log('announce request')
@@ -113,8 +113,6 @@ export class Torrent {
         }
       }
       return new Response(encode(res))
-    } else if (url.pathname === '/scrape') {
-      return new Response('Not found', {status: 404})
     } else if (url.pathname === '/_peers') {
       return new Response(JSON.stringify(this.peers), {headers: {'Content-Type': 'application/json'}})
     } else if (url.pathname === '/_purge') {
@@ -122,7 +120,7 @@ export class Torrent {
       await this.state.storage?.put('peers', this.peers)
       return new Response('purged')
     } else {
-      return new Response('Not found', {status: 404})
+      return new Response('not found', {status: 404})
     }
   }
 }
