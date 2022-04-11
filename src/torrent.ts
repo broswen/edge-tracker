@@ -37,6 +37,26 @@ export class Torrent {
     })
   }
 
+  // cleanPeers filters out any peers where the last announce timestamp is greater than 1 day
+  async cleanPeers() {
+    console.log('before clean', this.peers)
+    this.peers = Object.fromEntries(Object.entries(this.peers).filter((i) => Date.now() - i[1].timestamp < ONE_DAY))
+    this.state.storage?.put('peers', this.peers)
+    console.log('after clean', this.peers)
+  }
+
+  // getPeers returns a random list of peer ids up to the limit
+  getPeers(limit: number): string[] {
+    const copy = Object.keys(this.peers).slice(0)
+    const ids = []
+    while (ids.length < limit && copy.length > 0) {
+      const index = Math.floor(Math.random() * copy.length)
+      ids.push(copy[index])
+      copy.splice(index, 1)
+    }
+    return ids
+  }
+
   // Handle HTTP requests from clients.
   async fetch(request: Request) {
     const url = new URL(request.url)
@@ -62,7 +82,10 @@ export class Torrent {
       //limit to 30 peers in response
       req.numwant = Math.min(MAX_PEERS, req.numwant)
 
-      await this.state.storage?.put('peers', this.peers)
+      await this.cleanPeers()
+
+      const peers = this.getPeers(req.numwant)
+
       const res: TrackerResponse = {
         complete: 0,
         incomplete: 0,
@@ -70,26 +93,20 @@ export class Torrent {
         'min interval': 30,
         peers: []
       }
-      //TODO: randomly select peers from list
-      for (const [id, state] of Object.entries(this.peers)) {
-        //remove peers that haven't announced themselves within a day
-        if (Date.now() - state.timestamp > ONE_DAY) {
-          delete(this.peers[id])
-        }
 
-        if (res.peers.length < req.numwant) {
+      for (const id of peers) {
+        const peer = this.peers[id]
           if (typeof res.peers === 'string') {
             //TODO: fix compact peers response
             res.peers += `${req.ip}:${req.port}`
           } else {
             res.peers.push({
-              'peer id': encodeURI(state.peer_id),
-              ip: state.ip,
-              port: state.port,
+              'peer id': encodeURI(peer.peer_id),
+              ip: peer.ip,
+              port: peer.port,
             })
           }
-        }
-        if (state.completed) {
+        if (peer.completed) {
           res.complete++
         } else {
           res.incomplete++

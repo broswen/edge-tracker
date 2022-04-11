@@ -15,5 +15,5 @@ Durable Objects are used to store the state of each torrent and its peers. This 
 
 ### TODO
 - [x] remove old peers that didn't disconnect properly (based on last seen timestamp)
-- [ ] select random list of active peers to reply with
+- [x] select random list of active peers to reply with
 - [ ] handle compact peers response
