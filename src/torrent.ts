@@ -70,6 +70,7 @@ export class Torrent {
         'min interval': 30,
         peers: []
       }
+      //TODO: randomly select peers from list
       for (const [id, state] of Object.entries(this.peers)) {
         //remove peers that haven't announced themselves within a day
         if (Date.now() - state.timestamp > ONE_DAY) {
@@ -78,11 +79,11 @@ export class Torrent {
 
         if (res.peers.length < req.numwant) {
           if (typeof res.peers === 'string') {
-            //TODO: fix compaction
+            //TODO: fix compact peers response
             res.peers += `${req.ip}:${req.port}`
           } else {
             res.peers.push({
-              'peer id': state.peer_id,
+              'peer id': encodeURI(state.peer_id),
               ip: state.ip,
               port: state.port,
             })

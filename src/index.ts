@@ -1,11 +1,8 @@
 // In order for the workers runtime to find the class that implements
 // our Durable Object namespace, we must export it from the root module.
-import {TrackerResponse} from "./TrackerResponse";
 
 export { Torrent } from './torrent'
-import TrackerRequest from "./TrackerRequest";
 // @ts-ignore
-import {encode} from "bencode-js";
 
 export default {
   async fetch(request: Request, env: Env) {
@@ -37,7 +34,7 @@ async function handleAnnounce(request: Request, env: Env) {
   if (!url.searchParams.has('info_hash')) {
     return new Response('must specify info_hash', {status: 400})
   }
-  const hash_id = decodeURI(url.searchParams.get('info_hash') ?? '')
+  const hash_id = url.searchParams.get('info_hash') ?? ''
   const id = env.TORRENT.idFromName(hash_id)
   const obj = env.TORRENT.get(id)
   return obj.fetch(request)

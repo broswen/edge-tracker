@@ -14,8 +14,8 @@ export default class TrackerRequest {
     key: string
     constructor(url: string, ip: string) {
         const u = new URL(url)
-        this.info_hash = decodeURI(u.searchParams.get('info_hash') ?? '')
-        this.peer_id = decodeURI(u.searchParams.get('peer_id') ?? '')
+        this.info_hash = u.searchParams.get('info_hash') ?? ''
+        this.peer_id = u.searchParams.get('peer_id') ?? ''
         this.port = parseInt(u.searchParams.get('port') ?? '')
         this.uploaded = parseInt(u.searchParams.get('uploaded') ?? '')
         this.downloaded = parseInt(u.searchParams.get('downloaded') ?? '')
