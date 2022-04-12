@@ -46,6 +46,9 @@ export class Inventory {
         files: {}
       }
       for (const hash of info_hashes) {
+        if (!(hash in Object.keys(this.torrents))) {
+          continue
+        }
         res.files[encodeURIComponent(hash)] = {
           complete: this.torrents[hash].complete,
           downloaded: this.torrents[hash].downloaded,
