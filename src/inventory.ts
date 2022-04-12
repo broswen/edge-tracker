@@ -46,7 +46,7 @@ export class Inventory {
         files: {}
       }
       for (const hash of info_hashes) {
-        res.files[encodeURI(hash)] = {
+        res.files[encodeURIComponent(hash)] = {
           complete: this.torrents[hash].complete,
           downloaded: this.torrents[hash].downloaded,
           incomplete: this.torrents[hash].incomplete

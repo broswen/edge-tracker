@@ -19,7 +19,9 @@ Durable Objects are used to store the state of each torrent and its peers. This 
 - [x] remove old peers that didn't disconnect properly (based on last seen timestamp)
 - [x] select random list of active peers to reply with
 - [ ] handle compact peers response
-- [ ] use DO to store inventory of torrents and response to `/scrape`
+- [x] use DO to store inventory of torrents and response to `/scrape`
+- [ ] handle URL automatically decoding search params (manually parse)
+- [ ] don't store DO state in a single object, use prefix key structure
 
 ### Architecture
 

@@ -7,7 +7,7 @@ import {INVENTORY_KEY} from "./inventory";
 
 const ONE_DAY = 1000*60*24
 const MAX_PEERS = 30
-const INVENTORY_COOLDOWN = 1000 * 30
+const INVENTORY_COOLDOWN = 1000 * 5
 
 class PeerState {
   peer_id: string
@@ -109,7 +109,7 @@ export class Torrent {
             res.peers += `${req.ip}:${req.port}`
           } else {
             res.peers.push({
-              'peer id': encodeURI(peer.peer_id),
+              'peer id': encodeURIComponent(peer.peer_id),
               ip: peer.ip,
               port: peer.port,
             })
