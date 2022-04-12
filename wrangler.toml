@@ -15,8 +15,13 @@ format = "modules"
 main = "./index.mjs"
 
 [durable_objects]
-bindings = [{name = "TORRENT", class_name = "Torrent"}]
+bindings = [{name = "TORRENT", class_name = "Torrent"},
+            {name = "INVENTORY", class_name = "Inventory"}]
 
 [[migrations]]
 tag = "v1" # Should be unique for each entry
 new_classes = ["Torrent"]
+
+[[migrations]]
+tag = "v2" # Should be unique for each entry
+new_classes = ["Inventory"]

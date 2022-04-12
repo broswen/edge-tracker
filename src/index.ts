@@ -2,7 +2,8 @@
 // our Durable Object namespace, we must export it from the root module.
 
 export { Torrent } from './torrent'
-// @ts-ignore
+export { Inventory } from './inventory'
+import {INVENTORY_KEY} from "./inventory";
 
 export default {
   async fetch(request: Request, env: Env) {
@@ -11,6 +12,8 @@ export default {
       if (url.pathname === '/announce') {
         return await handleAnnounce(request, env)
       } else if (url.pathname === '/scrape') {
+        return await handleScrape(request, env)
+      } else if (url.pathname === '/_torrents') {
         return await handleScrape(request, env)
       } else if (url.pathname === '/_peers') {
         return await handleAnnounce(request, env)
@@ -26,7 +29,9 @@ export default {
 }
 
 async function handleScrape(request: Request, env: Env) {
-  return new Response('405', {status: 405})
+  const id = env.INVENTORY.idFromName(INVENTORY_KEY)
+  const obj = env.INVENTORY.get(id)
+  return obj.fetch(request)
 }
 
 async function handleAnnounce(request: Request, env: Env) {
@@ -42,4 +47,5 @@ async function handleAnnounce(request: Request, env: Env) {
 
 export interface Env {
   TORRENT: DurableObjectNamespace
+  INVENTORY: DurableObjectNamespace
 }
