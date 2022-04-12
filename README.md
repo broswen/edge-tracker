@@ -23,7 +23,6 @@ Durable Objects are used to store the state of each torrent and its peers. This 
 - [ ] handle URL automatically decoding search params (manually parse)
 - [ ] don't store DO state in a single object, use prefix key structure
   - peers/peer_id
-  - torrents/info_hash
 ### Architecture
 
 ![diagram](edge-tracker.drawio.png)

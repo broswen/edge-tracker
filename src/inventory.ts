@@ -23,12 +23,8 @@ class TorrentState {
 
 export class Inventory {
   state: DurableObjectState
-  torrents: {[key: string]: TorrentState} = {}
   constructor(state: DurableObjectState, env: Env) {
     this.state = state
-    this.state.blockConcurrencyWhile(async () => {
-      this.torrents = (await this.state.storage?.get<{[key: string]: TorrentState}>('torrents')) ?? {}
-    })
   }
 
   // Handle HTTP requests from clients.
@@ -36,35 +32,39 @@ export class Inventory {
     const url = new URL(request.url)
     if (url.pathname === '/scrape') {
       //get hashes from query params
-      let info_hashes = url.searchParams.getAll('info_hash') ?? []
-
-      if (info_hashes.length < 1) {
-        //if no hashes specified, fill with all existing hashes
-        info_hashes = Object.keys(this.torrents)
+      if (!url.searchParams.has('info_hash')) {
+        return new Response('must specify info_hash', {status: 400})
       }
+
+      const info_hashes = url.searchParams.getAll('info_hash') ?? []
+
       const res: ScrapeResponse = {
         files: {}
       }
+
       for (const hash of info_hashes) {
-        if (!(hash in Object.keys(this.torrents))) {
+        const torrent = await this.state.storage?.get<TorrentState>(hash)
+        if (!torrent) {
           continue
         }
-        res.files[encodeURIComponent(hash)] = {
-          complete: this.torrents[hash].complete,
-          downloaded: this.torrents[hash].downloaded,
-          incomplete: this.torrents[hash].incomplete
+        res.files[hash] = {
+          complete: torrent.complete,
+          downloaded: torrent.downloaded,
+          incomplete: torrent.incomplete
         }
       }
       return new Response(encode(res))
     } else if (url.pathname === '/_announce') {
       //torrent DOs announce their state here using query params
       const torrent = new TorrentState(request.url)
-      this.torrents[torrent.info_hash] = torrent
-      await this.state.storage?.put('torrents', this.torrents)
+      await this.state.storage?.put(torrent.info_hash, torrent)
       return new Response('OK')
     } else if (url.pathname === '/_torrents') {
       //debug endpoint for listing torrents internal state
-      return new Response(JSON.stringify(this.torrents), {headers: {'Content-Type': 'application/json'}})
+      //TODO: list() is returning an empty map for some reason
+      const torrents = await this.state.storage?.list<TorrentState>()
+      console.log('torrents', torrents)
+      return new Response(JSON.stringify(torrents), {headers: {'Content-Type': 'application/json'}})
     } else {
       return new Response('not found', {status: 404})
     }
