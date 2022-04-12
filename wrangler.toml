@@ -20,4 +20,8 @@ bindings = [{name = "TORRENT", class_name = "Torrent"},
 
 [[migrations]]
 tag = "v1" # Should be unique for each entry
-new_classes = ["Torrent", "Inventory"]
+new_classes = ["Torrent"]
+
+[[migrations]]
+tag = "v2" # Should be unique for each entry
+new_classes = ["Inventory"]

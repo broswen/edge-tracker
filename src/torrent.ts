@@ -2,10 +2,12 @@ import {Env} from "./index";
 import TrackerRequest from "./TrackerRequest";
 // @ts-ignore
 import {encode} from "bencode-js";
-import {PeerInfo, TrackerResponse} from "./TrackerResponse";
+import {TrackerResponse} from "./TrackerResponse";
+import {INVENTORY_KEY} from "./inventory";
 
 const ONE_DAY = 1000*60*24
 const MAX_PEERS = 30
+const INVENTORY_COOLDOWN = 1000 * 30
 
 class PeerState {
   peer_id: string
@@ -29,20 +31,23 @@ class PeerState {
 
 export class Torrent {
   state: DurableObjectState
+  downloaded = 0
   peers: {[key: string]: PeerState } = {}
+  lastUpdate = 0
+  env: Env
   constructor(state: DurableObjectState, env: Env) {
     this.state = state
+    this.env = env
     this.state.blockConcurrencyWhile(async () => {
-      this.peers= (await this.state.storage?.get<{[key: string]: PeerState}>('peers')) ?? {}
+      this.peers = (await this.state.storage?.get<{ [key: string]: PeerState }>('peers')) ?? {}
+      this.downloaded = (await this.state.storage?.get<number>('downloaded')) ?? 0
     })
   }
 
   // cleanPeers filters out any peers where the last announce timestamp is greater than 1 day
   async cleanPeers() {
-    console.log('before clean', this.peers)
     this.peers = Object.fromEntries(Object.entries(this.peers).filter((i) => Date.now() - i[1].timestamp < ONE_DAY))
     this.state.storage?.put('peers', this.peers)
-    console.log('after clean', this.peers)
   }
 
   // getPeers returns a random list of peer ids up to the limit
@@ -58,22 +63,25 @@ export class Torrent {
   }
 
   // Handle HTTP requests from clients.
-  async fetch(request: Request, env: Env) {
+  async fetch(request: Request) {
     const url = new URL(request.url)
     if (url.pathname === '/announce') {
-      console.log('announce request')
-      console.log('peers', this.peers)
       const req = new TrackerRequest(request.url, request.headers.get('CF-Connecting-IP') ?? '')
 
       if (req.event === 'stopped') {
         delete this.peers[req.peer_id]
       } else {
+        if (req.event === 'completed')  {
+          this.downloaded++
+          this.state.storage?.put('downloaded', this.downloaded)
+        }
         this.peers[req.peer_id] = {
           timestamp: Date.now(),
           useragent: request.headers.get('user-agent') ?? '',
           peer_id: req.peer_id,
           ip: req.ip,
           port: req.port,
+          //TODO: look for previous peer state and don't update completed -> incomplete on scheduled announce (event is null)
           completed: req.event === 'completed',
           key: req.key
         }
@@ -106,12 +114,29 @@ export class Torrent {
               port: peer.port,
             })
           }
+      }
+
+      for (const peer of Object.values(this.peers)) {
         if (peer.completed) {
           res.complete++
         } else {
           res.incomplete++
         }
       }
+
+      //update inventory if time since last update is greater than cooldown
+      if (Date.now() - this.lastUpdate > INVENTORY_COOLDOWN) {
+        const u = new URL('https://example.com/_announce')
+        u.searchParams.append('info_hash', req.info_hash)
+        u.searchParams.append('complete', res.complete.toString())
+        u.searchParams.append('incomplete', res.incomplete.toString())
+        u.searchParams.append('downloaded', this.downloaded.toString())
+        const id = this.env.INVENTORY.idFromName(INVENTORY_KEY)
+        const obj = this.env.INVENTORY.get(id)
+        obj.fetch(u.toString())
+        this.lastUpdate = Date.now()
+      }
+
       return new Response(encode(res))
     } else if (url.pathname === '/_peers') {
       return new Response(JSON.stringify(this.peers), {headers: {'Content-Type': 'application/json'}})
