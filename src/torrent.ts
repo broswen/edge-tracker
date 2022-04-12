@@ -8,6 +8,7 @@ import {INVENTORY_KEY} from "./inventory";
 const ONE_DAY = 1000*60*24
 const MAX_PEERS = 30
 const INVENTORY_COOLDOWN = 1000 * 5
+const PEER_PREFIX = 'peers/'
 
 class PeerState {
   peer_id: string
@@ -32,32 +33,35 @@ class PeerState {
 export class Torrent {
   state: DurableObjectState
   downloaded = 0
-  peers: {[key: string]: PeerState } = {}
   lastUpdate = 0
   env: Env
   constructor(state: DurableObjectState, env: Env) {
     this.state = state
     this.env = env
     this.state.blockConcurrencyWhile(async () => {
-      this.peers = (await this.state.storage?.get<{ [key: string]: PeerState }>('peers')) ?? {}
       this.downloaded = (await this.state.storage?.get<number>('downloaded')) ?? 0
     })
   }
 
   // cleanPeers filters out any peers where the last announce timestamp is greater than 1 day
   async cleanPeers() {
-    this.peers = Object.fromEntries(Object.entries(this.peers).filter((i) => Date.now() - i[1].timestamp < ONE_DAY))
-    this.state.storage?.put('peers', this.peers)
+    const peers: Map<string, PeerState> = (await this.state.storage?.list<PeerState>( {prefix: PEER_PREFIX})) ?? new Map<string, PeerState>()
+    for (const peer of Object.values(peers)) {
+      if (Date.now() - peer.timestamp > ONE_DAY) {
+        await this.state.storage?.delete(PEER_PREFIX + peer.peer_id)
+      }
+    }
   }
 
   // getPeers returns a random list of peer ids up to the limit
-  getPeers(limit: number): string[] {
-    const copy = Object.keys(this.peers).slice(0)
+  async getPeers(limit: number): Promise<string[]> {
+    const peers: Map<string, PeerState> = (await this.state.storage?.list<PeerState>( {prefix: PEER_PREFIX})) ?? new Map<string, PeerState>()
+    const peer_ids = Array.from(peers.values()).map(p => p.peer_id)
     const ids = []
-    while (ids.length < limit && copy.length > 0) {
-      const index = Math.floor(Math.random() * copy.length)
-      ids.push(copy[index])
-      copy.splice(index, 1)
+    while (ids.length < limit && peer_ids.length > 0) {
+      const index = Math.floor(Math.random() * peer_ids.length)
+      ids.push(peer_ids[index])
+      peer_ids.splice(index, 1)
     }
     return ids
   }
@@ -69,13 +73,13 @@ export class Torrent {
       const req = new TrackerRequest(request.url, request.headers.get('CF-Connecting-IP') ?? '')
 
       if (req.event === 'stopped') {
-        delete this.peers[req.peer_id]
+        await this.state.storage?.delete(PEER_PREFIX + req.peer_id)
       } else {
         if (req.event === 'completed')  {
           this.downloaded++
           this.state.storage?.put('downloaded', this.downloaded)
         }
-        this.peers[req.peer_id] = {
+        await this.state.storage?.put<PeerState>(PEER_PREFIX + req.peer_id, {
           timestamp: Date.now(),
           useragent: request.headers.get('user-agent') ?? '',
           peer_id: req.peer_id,
@@ -84,15 +88,15 @@ export class Torrent {
           //TODO: look for previous peer state and don't update completed -> incomplete on scheduled announce (event is null)
           completed: req.event === 'completed',
           key: req.key
-        }
+        })
       }
 
       //limit to 30 peers in response
       req.numwant = Math.min(MAX_PEERS, req.numwant)
 
       await this.cleanPeers()
-
-      const peers = this.getPeers(req.numwant)
+      const allPeers = await this.state.storage?.list<PeerState>({prefix: PEER_PREFIX}) ?? new Map<string, PeerState>()
+      const peers = await this.getPeers(req.numwant)
 
       const res: TrackerResponse = {
         complete: 0,
@@ -103,7 +107,8 @@ export class Torrent {
       }
 
       for (const id of peers) {
-        const peer = this.peers[id]
+        const peer = await this.state.storage?.get<PeerState>(PEER_PREFIX + id)
+        if (peer) {
           if (typeof res.peers === 'string') {
             //TODO: fix compact peers response
             res.peers += `${req.ip}:${req.port}`
@@ -114,9 +119,10 @@ export class Torrent {
               port: peer.port,
             })
           }
+        }
       }
 
-      for (const peer of Object.values(this.peers)) {
+      for (const peer of Array.from(allPeers.values())) {
         if (peer.completed) {
           res.complete++
         } else {
