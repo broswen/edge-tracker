@@ -79,14 +79,15 @@ export class Torrent {
           this.downloaded++
           this.state.storage?.put('downloaded', this.downloaded)
         }
+        const prevState = await this.state.storage?.get<PeerState>(PEER_PREFIX + req.peer_id)
         await this.state.storage?.put<PeerState>(PEER_PREFIX + req.peer_id, {
           timestamp: Date.now(),
           useragent: request.headers.get('user-agent') ?? '',
           peer_id: req.peer_id,
           ip: req.ip,
           port: req.port,
-          //TODO: look for previous peer state and don't update completed -> incomplete on scheduled announce (event is null)
-          completed: req.event === 'completed',
+          //if previous state exists, and it was completed, or current event is completed
+          completed: (prevState && prevState.completed) || req.event === 'completed',
           key: req.key
         })
       }
@@ -145,10 +146,12 @@ export class Torrent {
 
       return new Response(encode(res))
     } else if (url.pathname === '/_peers') {
-      return new Response(JSON.stringify(this.peers), {headers: {'Content-Type': 'application/json'}})
+      const peers = await this.state.storage?.list<PeerState>({prefix: PEER_PREFIX})
+      return new Response(JSON.stringify(peers), {headers: {'Content-Type': 'application/json'}})
     } else if (url.pathname === '/_purge') {
-      this.peers = {}
-      await this.state.storage?.put('peers', this.peers)
+      this.downloaded = 0
+      this.lastUpdate = 0
+      await this.state.storage?.deleteAll()
       return new Response('purged')
     } else {
       return new Response('not found', {status: 404})
