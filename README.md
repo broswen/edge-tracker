@@ -8,7 +8,7 @@ Durable Objects are used to store the state of each torrent and its peers. This 
 
 `GET /announce?info_hash=...` is the announce endpoint for clients.
 
-`GET /scrape?info_hash=....` is the scrape endpoint for clients
+`GET /scrape?info_hash=....` is the scrape endpoint for clients, must explicitly specify hashes.
 
 `GET /_peers?info_hash=...` is a debug endpoint that returns the peer state for a metainfo file.
 
@@ -24,6 +24,9 @@ Durable Objects are used to store the state of each torrent and its peers. This 
 - [x] use DO to store inventory of torrents and response to `/scrape`
 - [ ] handle URL automatically decoding search params (manually parse)
 - [x] don't store DO state in a single object, use prefix key structure
+- [ ] handle peer_id and key validation, prevent peer_id reuse (started) unless key matches
+- [ ] why isn't storage.list() json returning for debug endpoints?
+- [ ] use cache API for scrape requests to reduce load a bit, relatively low TTL
 ### Architecture
 
 ![diagram](edge-tracker.drawio.png)
