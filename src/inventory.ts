@@ -60,11 +60,11 @@ export class Inventory {
       await this.state.storage?.put(torrent.info_hash, torrent)
       return new Response('OK')
     } else if (url.pathname === '/_torrents') {
-      //debug endpoint for listing torrents internal state
-      //TODO: list() is returning an empty map for some reason
       const torrents = await this.state.storage?.list<TorrentState>()
-      console.log('torrents', torrents)
-      return new Response(JSON.stringify(torrents), {headers: {'Content-Type': 'application/json'}})
+      if (!torrents) {
+        return new Response(JSON.stringify([]))
+      }
+      return new Response(JSON.stringify(Array.from(torrents.values())), {headers: {'Content-Type': 'application/json'}})
     } else {
       return new Response('not found', {status: 404})
     }

@@ -29,9 +29,18 @@ export default {
 }
 
 async function handleScrape(request: Request, env: Env) {
+  const cache = caches.default
+  const cacheResp = await cache.match(request)
+  if (cacheResp) {
+    return cacheResp
+  }
   const id = env.INVENTORY.idFromName(INVENTORY_KEY)
   const obj = env.INVENTORY.get(id)
-  return obj.fetch(request)
+  let resp = await obj.fetch(request)
+  resp = new Response(resp.body, resp)
+  resp.headers.append('Cache-Control', 's-maxage=10')
+  await cache.put(new Request(request.url), resp.clone())
+  return resp
 }
 
 async function handleAnnounce(request: Request, env: Env) {

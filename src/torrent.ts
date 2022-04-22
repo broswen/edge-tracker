@@ -147,7 +147,10 @@ export class Torrent {
       return new Response(encode(res))
     } else if (url.pathname === '/_peers') {
       const peers = await this.state.storage?.list<PeerState>({prefix: PEER_PREFIX})
-      return new Response(JSON.stringify(peers), {headers: {'Content-Type': 'application/json'}})
+      if (!peers) {
+        return new Response(JSON.stringify([]), {headers: {'Content-Type': 'application/json'}})
+      }
+      return new Response(JSON.stringify(Array.from(peers.values())), {headers: {'Content-Type': 'application/json'}})
     } else if (url.pathname === '/_purge') {
       this.downloaded = 0
       this.lastUpdate = 0
