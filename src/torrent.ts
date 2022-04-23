@@ -75,11 +75,19 @@ export class Torrent {
       if (req.event === 'stopped') {
         await this.state.storage?.delete(PEER_PREFIX + req.peer_id)
       } else {
+        const prevState = await this.state.storage?.get<PeerState>(PEER_PREFIX + req.peer_id)
+
+        // if client is starting and previous state exists, validate key matches before updating info
+        // prevent another client redirecting traffic to another IP destined for another ID
+        if (req.event === 'started' && prevState && prevState.key !== req.key) {
+          return new Response(`key mismatch for ${req.peer_id}`, {status: 401})
+        }
+
         if (req.event === 'completed')  {
           this.downloaded++
           this.state.storage?.put('downloaded', this.downloaded)
         }
-        const prevState = await this.state.storage?.get<PeerState>(PEER_PREFIX + req.peer_id)
+
         await this.state.storage?.put<PeerState>(PEER_PREFIX + req.peer_id, {
           timestamp: Date.now(),
           useragent: request.headers.get('user-agent') ?? '',
